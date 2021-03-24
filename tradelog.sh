@@ -39,3 +39,15 @@ print_help(){
     echo "                 -several uses of this filter at once are not possible (script exits with Error)"
     echo ""
 }
+
+COMMAND=""              # variable for loaded commands
+
+while ["$#" -gt 0] do   # while there are arguments to be read from input
+    case "$1" in        # $1 means parameter #1
+    list-tick | pos)
+        COMMAND="$1"
+        shift           # throws away the argument we just loaded, and moves all the other arguments one to the left
+        ;;              # second arguments will now be first, third will be second, etc.
+    -h | --help)
+        print_help
+        
