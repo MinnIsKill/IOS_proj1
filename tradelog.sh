@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 #     LORD GIVE ME THE MENTAL CAPACITY TO REMEMBER THESE, but in the meantime, this cheatsheet should suffice.
 # GitHub push flow:   $ git add .
@@ -15,10 +15,28 @@
 # !!!
 # pro jeden den mi to myslim stacilo, video jsem skoncil v cca 39:30, pushuju a jdu na prednasky...
 
+#Pokud skript nedostane ani filtr ani příkaz, opisuje záznamy na standardní výstup.
+#Skript umí zpracovat i záznamy komprimované pomocí nástroje gzip (v případě, že název souboru končí .gz).
+#V případě, že skript na příkazové řádce nedostane soubory se záznamy (LOG, LOG2 …), očekává záznamy na standardním vstupu.
+#Pokud má skript vypsat seznam, každá položka je vypsána na jeden řádek a pouze jednou. Není-li uvedeno jinak, je pořadí 
+#  řádků dáno abecedně dle tickerů. Položky se nesmí opakovat.
+#Grafy jsou vykresleny pomocí ASCII a jsou otočené doprava. Každý řádek histogramu udává ticker. Kladná hodnota či četnost 
+#  jsou vyobrazeny posloupností znaku mřížky #, záporná hodnota (u graph-pos) je vyobrazena posloupností znaku vykřičníku !.
+
+#Skript žádný soubor nemodifikuje. Skript nepoužívá dočasné soubory.
+#Můžete předpokládat, že záznamy jsou ve vstupních souborech uvedeny chronologicky a je-li na vstupu více souborů, jejich pořadí je také chronologické.
+
+#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+#Pořadí argumentů stačí uvažovat takové, že nejřív budou všechny přepínače, pak (volitelně) příkaz a nakonec 
+#seznam vstupních souborů (lze tedy použít getopts). Podpora argumentů v libovolném pořadí je nepovinné rozšíření, 
+#jehož implementace může kompenzovat případnou ztrátu bodů v jiné časti projektu.
+#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 export POSIXLY_CORRECT=yes
 export LC_NUMERIC=en_US.UTF-8
 
-print_help(){
+print_help() {
+    echo ""
     echo "Usage: tradelog [-h|--help]"
     echo "       tradelog [FILTER] [COMMAND] [LOG [LOG2 [...]]"
     echo ""
@@ -51,52 +69,108 @@ b_DATETIME="9999-99-99 24:00:00"    # initialize to a value where everything wil
 
 TICKERS=""
 COMMAND=""                          # variable for loaded command (CAN ALWAYS BE ONLY ONE)
-LOG_FILEZ=""
+LOG_FILES=""
 GZ_LOG_FILES=""
 
-while ["$#" -gt 0]; do      # while there are arguments to be read from input
-    case "$1" in            # $1 means parameter #1
-    list-tick | profit | pos | last-price | hist-ord | graph-pos)
-        #if (COMMAND != NULL) --> ERROR (two commands were input)
-        COMMAND="$1"
-        shift               # throws away the argument we just loaded, and moves all the other arguments one to the left
-        ;;                  # second arguments will now be first, third will be second, etc.
-    -h | --help)
-        print_help
+#=====================================================================
+#                           FILTERS PARSING
+#=====================================================================
+for param in "$@"; do
+    if [ \( "$1" = "-h" \) -o \( "$1" = "--help" \) ]; then
+	    shift
+	    print_help
         exit 0
-        ;;
-    -w)
-        WIDTH="$2"
+    elif [ "$1" = "-a" ]; then
         shift
+        echo "found -a"
+    elif [ "$1" = "-b" ]; then
         shift
-        ;;
-    #-t)
-        TICKERS="$1|$TICKERS"
-    #-a)
-        #a_DATETIME="$2 $3"
-        #shift
-        #shift
-        #shift
-        #;;
-    #-b)
-        #b_DATETIME="$2 $3"
-        #shift
-        #shift
-        #shift
-        #;;
-    esac
-
-
-#TADY BUDU DOPLNOVAT FUNKCE PRO KAZDY COMMAND
-    if [COMMAND==""]; then
-        eval "$READ_FILTERED | awk "
+        echo "found -b"
+    elif [ "$1" = "-t" ]; then
+        shift
+        echo "found -t"
+    elif [ "$1" = "-w" ]; then
+        shift
+        echo "found -w"
+    elif [[ "$1" == -* ]]; then
+        echo "an attempt at inputting a parameter was made, but sadly, the program didn't recognize '$1'."
+        echo "Please refer to -h for more info. Program will shut down."
+        exit 0
+    else
+        break
     fi
-
-
-
-
-
 done
+
+comm_flag=0
+comm_msg_flag=0
+i=0
+
+#=====================================================================
+#                           COMMAND PARSING
+#=====================================================================
+until [ $i -gt 1 ] # will go through twice just to check whether next arg isn't a command as well (forbidden situation) 
+do
+    if [ "$1" = "list-tick" ]; then
+	    shift
+        if [ $comm_flag = 1 ]; then
+            echo "ERROR: there can only be one command input. Program will shut down."
+            exit 0
+        fi
+        comm_flag=1
+        echo "found list-tick"
+    elif [ "$1" = "profit" ]; then
+        shift
+        if [ $comm_flag = 1 ]; then
+            echo "ERROR: there can only be one command input. Program will shut down."
+            exit 0
+        fi
+        comm_flag=1
+        echo "found profit"
+    elif [ "$1" = "pos" ]; then
+        shift
+        if [ $comm_flag = 1 ]; then
+            echo "ERROR: there can only be one command input. Program will shut down."
+            exit 0
+        fi
+        comm_flag=1
+        echo "found pos"
+    elif [ "$1" = "last-price" ]; then
+        shift
+        if [ $comm_flag = 1 ]; then
+            echo "ERROR: there can only be one command input. Program will shut down."
+            exit 0
+        fi
+        comm_flag=1
+        echo "found last-price"
+    elif [ "$1" = "list-ord" ]; then
+        shift
+        if [ $comm_flag = 1 ]; then
+            echo "ERROR: there can only be one command input. Program will shut down."
+            exit 0
+        fi
+        comm_flag=1
+        echo "found list-ord"
+    elif [ "$1" = "graph-pos" ]; then
+        shift
+        if [ $comm_flag = 1 ]; then
+            echo "ERROR: there can only be one command input. Program will shut down."
+            exit 0
+        fi
+        comm_flag=1
+        echo "found graph-pos"
+    else
+        if [ $comm_msg_flag = 0 ]; then
+            echo "no command input."
+        fi
+    fi
+    #echo "$i"
+    comm_msg_flag=1
+    i=$((i+1))
+done
+
+
+
+
 
 GZ_READ_INPUT="gzip -d -c $GZIP | cat $LOG_FILES - | sort"
 READ_INPUT="cat $LOG_FILES - | sort"
