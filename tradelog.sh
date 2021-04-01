@@ -12,9 +12,6 @@
 # VSCode Keybind-sheet:  CTRL+SHIFT+B -> BUILD
 #                        F5 -> DEBUG
 
-# !!!
-# pro jeden den mi to myslim stacilo, video jsem skoncil v cca 39:30, pushuju a jdu na prednasky...
-
 #Pokud skript nedostane ani filtr ani příkaz, opisuje záznamy na standardní výstup.
 #Skript umí zpracovat i záznamy komprimované pomocí nástroje gzip (v případě, že název souboru končí .gz).
 #V případě, že skript na příkazové řádce nedostane soubory se záznamy (LOG, LOG2 …), očekává záznamy na standardním vstupu.
@@ -32,6 +29,9 @@
 #jehož implementace může kompenzovat případnou ztrátu bodů v jiné časti projektu.
 #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+#TODO: solve zipped logs problem
+#TODO: figure out multiple logs problem
+
 export POSIXLY_CORRECT=yes
 export LC_NUMERIC=en_US.UTF-8
 
@@ -42,7 +42,7 @@ print_help() {
     echo ""
     echo "COMMANDS (only one can be used with each call)"
     echo ""
-    echo "   list-tick     -prints list of occurring stock market symbols, so-called “tickers”"
+    echo "   list-tick     -prints list of occurring stock market symbols, so-called \"tickers\""
     echo "   profit        -prints total profit from closed positions"
     echo "   pos           -prints values of currently held positions sorted downwardly based on value"
     echo "   last-price    -prints the last known value for each ticker"
@@ -66,6 +66,8 @@ print_help() {
 a_DATETIME="0000-00-00 00:00:00"    # initialize to a value where everything will be after this date
                                     # (alternatively, an empty string would suffice)
 b_DATETIME="9999-99-99 24:00:00"    # initialize to a value where everything will be before this date
+w_flag=0
+help_flag=0
 
 TICKERS=""
 COMMAND=""                          # variable for loaded command (CAN ALWAYS BE ONLY ONE)
@@ -76,20 +78,43 @@ GZ_LOG_FILES=""
 #                           FILTERS PARSING
 #=====================================================================
 for param in "$@"; do
-    if [ \( "$1" = "-h" \) -o \( "$1" = "--help" \) ]; then
-	    shift
-	    print_help
-        exit 0
+    if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        if [ $help_flag = 0 ]; then
+	        print_help
+            exit 0
+        fi
+        shift
     elif [ "$1" = "-a" ]; then
         shift
-        echo "found -a"
+        #echo "found -a"
+        if [[ "$1" =~ [0-9]{4}-[0-9]{2}-[0-9]{2}[" "]{1}[0-9]{2}:[0-9]{2}:[0-9]{2} ]]; then
+            a_DATETIME="$1"
+            shift
+        else
+            echo "Wrong date format input for filter -a. Treated as an error."
+            echo "Required format: \"YYYY-MM-DD HH:MM:SS\""
+            exit 0
+        fi
     elif [ "$1" = "-b" ]; then
         shift
-        echo "found -b"
+        #echo "found -b"
+        if [[ "$1" =~ [0-9]{4}-[0-9]{2}-[0-9]{2}[" "]{1}[0-9]{2}:[0-9]{2}:[0-9]{2} ]]; then
+            b_DATETIME="$1"
+            shift
+        else
+            echo "Wrong date format input for filter -b. Treated as an error."
+            echo "Required format: \"YYYY-MM-DD HH:MM:SS\""
+            exit 0
+        fi
     elif [ "$1" = "-t" ]; then
         shift
         echo "found -t"
     elif [ "$1" = "-w" ]; then
+        if [ $w_flag = 1 ]; then
+            echo "filter '-w' used more than once, which is regarded as error. Program will shut down."
+            exit 0
+        fi
+        w_flag=1
         shift
         echo "found -w"
     elif [[ "$1" == -* ]]; then
@@ -98,6 +123,9 @@ for param in "$@"; do
         exit 0
     else
         break
+    fi
+    if [ $help_flag = 0 ]; then
+        help_flag=1
     fi
 done
 
@@ -168,15 +196,61 @@ do
     i=$((i+1))
 done
 
+#GZ_flag=0
+GZ_READ_INPUT=""
+READ_INPUT="cat $param - | sort"
+
+#=====================================================================
+#                           LOAD LOGS
+#=====================================================================
+
+#log=("$(ls -d $1)")
+#for param in "${log[@]}"; do
+#    if [[ "$param" =~ .gz$ ]]; then
+#        GZ_READ_INPUT="gzip -d -c $GZIP | $param - | sort"
+#        #GZ_flag=1
+#    else
+#        READ_INPUT="cat $param | sort"
+#    fi
+#done
+
+list="" #variable to load logs into
+
+if [[ "$1" =~ .gz$ ]]; then
+    list=($(gzip -d -c $list)) #if the input is zipped, load it like this (NOT TESTED YET AND I'M NOT EVEN GONNA UNTIL I'VE MADE THE PROGRAM WORK WITHOUT)
+elif [[ "$1" =~ .log$ ]]; then
+    list=($(ls -d $1)) #if the input is normal log file, load whole log into this variable
+else
+    echo ""
+    #read logs from input, I'll get back to this if I have spare time (very unlikely)
+fi
+
+FINAL_OUTPUT=""
+
+#=====================================================================
+#                           COMMANDS EXECUTION
+#=====================================================================
+while read -r line; do #if the input was a normal log file, this is how to read it from our copy line by line
+#which means that here, I will be executing the commands... is this done then? have I figured it out? could it be that easy? only time will tell...
+    #LOADS ONLY LINES WITHIN SET -a AND -b
+    FINAL_OUTPUT=$(awk -F ';' -v l="$line" -v a="$a_DATETIME" -v b="$b_DATETIME" '{if ( ($1 > a) && ($1 < b) ) { print $line }}')
+    #TODO: -t
+    #FINAL_OUTPUT=$(awk -F ';' -v l="$line" -v t="$TICKERS" ' ')        NĚCO TAKOVÉHO ASI??
+done < "$list"
+
+echo ""
+echo "$FINAL_OUTPUT"
+echo ""
 
 
 
-
-GZ_READ_INPUT="gzip -d -c $GZIP | cat $LOG_FILES - | sort"
-READ_INPUT="cat $LOG_FILES - | sort"
-NO_INPUT="cat"
-
-NOTICKS_FILTER="cat"
 TICKS_FILTER="grep '^.*;\($TICKERS\)'"
+#READ_FILTERED="eval $READ_INPUT | awk -F ';' 'if (\$1 > $a_DATETIME &&) {print \$0}' | eval $TICKS_FILTER"    #';' is separator(delimiter)
 
-READ_FILTERED="eval $READ_INPUT | awk -F ';' 'if (\$1 > $a_DATETIME &&) {print \$0}' | eval $TICK_FILTER"    #';' is separator(delimiter)
+echo "-a date is $a_DATETIME"
+echo "-b date is $b_DATETIME"
+
+#GZ_READ_INPUT="gzip -d -c $GZIP | cat $LOG_FILES - | sort"
+#READ_INPUT="cat $LOG_FILES - | sort"
+#NO_INPUT="cat"
+#NOTICKS_FILTER="cat"
