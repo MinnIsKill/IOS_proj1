@@ -214,18 +214,19 @@ READ_INPUT="cat $param - | sort"
 #    fi
 #done
 
-list="" #variable to load logs into
+logs="" #variable to load logs into
 
 if [[ "$1" =~ .gz$ ]]; then
-    list=($(gzip -d -c $list)) #if the input is zipped, load it like this (NOT TESTED YET AND I'M NOT EVEN GONNA UNTIL I'VE MADE THE PROGRAM WORK WITHOUT)
+    logs=($(gzip -d -c $list)) #if the input is zipped, load it like this (NOT TESTED YET AND I'M NOT EVEN GONNA UNTIL I'VE MADE THE PROGRAM WORK WITHOUT)
 elif [[ "$1" =~ .log$ ]]; then
-    list=($(ls -d $1)) #if the input is normal log file, load whole log into this variable
+    logs=($(ls -d $1)) #if the input is normal log file, load whole log into this variable
 else
     echo ""
     #read logs from input, I'll get back to this if I have spare time (very unlikely)
 fi
 
-FINAL_OUTPUT=""
+#I WILL ALSO HAVE TO IMPLEMENT MULTIPLE LOGS LOADING, PROBABLY SHIFT HERE AND CHECK IF THERE'S ANY OTHER INPUT AFTER THE FIRST LOG WAS LOADED AND
+#IF THERE IS THEN JUST CONCATENATE IT TO WHAT HAS ALREADY BEEN LOADED
 
 #=====================================================================
 #                           COMMANDS EXECUTION
@@ -233,13 +234,13 @@ FINAL_OUTPUT=""
 while read -r line; do #if the input was a normal log file, this is how to read it from our copy line by line
 #which means that here, I will be executing the commands... is this done then? have I figured it out? could it be that easy? only time will tell...
     #LOADS ONLY LINES WITHIN SET -a AND -b
-    FINAL_OUTPUT=$(awk -F ';' -v l="$line" -v a="$a_DATETIME" -v b="$b_DATETIME" '{if ( ($1 > a) && ($1 < b) ) { print $line }}')
+    logs=$(awk -F ';' -v l="$line" -v a="$a_DATETIME" -v b="$b_DATETIME" '{if ( ($1 > a) && ($1 < b) ) { print $line }}')
     #TODO: -t
     #FINAL_OUTPUT=$(awk -F ';' -v l="$line" -v t="$TICKERS" ' ')        NĚCO TAKOVÉHO ASI??
-done < "$list"
+done < "$logs"
 
 echo ""
-echo "$FINAL_OUTPUT"
+echo "$logs"
 echo ""
 
 
