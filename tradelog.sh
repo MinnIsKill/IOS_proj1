@@ -65,14 +65,19 @@ print_help() {
 
 a_DATETIME="0000-00-00 00:00:00"    # initialize to a value where everything will be after this date
                                     # (alternatively, an empty string would suffice)
-b_DATETIME="9999-99-99 24:00:00"    # initialize to a value where everything will be before this date
+b_DATETIME="9999-99-99 99:99:99"    # initialize to a value where everything will be before this date
+width=1000
 w_flag=0
 help_flag=0
 
+newline=$'\n'
+
+declare -a tickers_arr
+
 TICKERS=""
+tickers_flag=0
+tickers_cnt=0
 COMMAND=""                          # variable for loaded command (CAN ALWAYS BE ONLY ONE)
-LOG_FILES=""
-GZ_LOG_FILES=""
 
 #=====================================================================
 #                           FILTERS PARSING
@@ -102,21 +107,36 @@ for param in "$@"; do
             b_DATETIME="$1"
             shift
         else
-            echo "Wrong date format input for filter -b. Treated as an error."
+            echo "Wrong date format input for filter -b. Treated as an error. Program will shut down."
             echo "Required format: \"YYYY-MM-DD HH:MM:SS\""
             exit 0
         fi
     elif [ "$1" = "-t" ]; then
         shift
-        echo "found -t"
+        if [ $tickers_flag = 0 ]; then
+            tickers_flag=1
+            TICKERS="$1"
+        else
+            #TICKERS="${TICKERS}${newline}$1"
+            TICKERS="${TICKERS};$1"
+        fi
+        tickers_cnt=$((tickers_cnt+1))
+        #tickers_arr[$tickers_cnt]=$1
+        shift
     elif [ "$1" = "-w" ]; then
+        shift
         if [ $w_flag = 1 ]; then
-            echo "filter '-w' used more than once, which is regarded as error. Program will shut down."
+            echo "filter '-w' used more than once, which is treated as error. Program will shut down."
             exit 0
         fi
-        w_flag=1
+        if [[ "$1" =~ [0-9]{1,20} ]]; then
+            w_flag=1
+            width="$1"
+        else
+            echo "the argument for '-w' is NaN. Treated as an error. Program will shut down."
+            exit 0
+        fi
         shift
-        echo "found -w"
     elif [[ "$1" == -* ]]; then
         echo "an attempt at inputting a parameter was made, but sadly, the program didn't recognize '$1'."
         echo "Please refer to -h for more info. Program will shut down."
@@ -197,8 +217,6 @@ do
 done
 
 #GZ_flag=0
-GZ_READ_INPUT=""
-READ_INPUT="cat $param - | sort"
 
 #=====================================================================
 #                           LOAD LOGS
@@ -229,27 +247,85 @@ fi
 #IF THERE IS THEN JUST CONCATENATE IT TO WHAT HAS ALREADY BEEN LOADED
 
 #=====================================================================
-#                           COMMANDS EXECUTION
+#                           FILTERS EXECUTION
 #=====================================================================
 while read -r line; do #if the input was a normal log file, this is how to read it from our copy line by line
 #which means that here, I will be executing the commands... is this done then? have I figured it out? could it be that easy? only time will tell...
-    #LOADS ONLY LINES WITHIN SET -a AND -b
-    logs=$(awk -F ';' -v l="$line" -v a="$a_DATETIME" -v b="$b_DATETIME" '{if ( ($1 > a) && ($1 < b) ) { print $line }}')
-    #TODO: -t
-    #FINAL_OUTPUT=$(awk -F ';' -v l="$line" -v t="$TICKERS" ' ')        NĚCO TAKOVÉHO ASI??
+    logs_filtered=$(awk -F ';' -v a="$a_DATETIME" -v b="$b_DATETIME" -v tickers=$TICKERS -v cnt=$tickers_cnt '{ split(tickers,tickers_split,";"); {if ( cnt == 0 ) { cnt=1 } } {for (i = cnt; i > 0; i--) {if ( ($1 > a) && ($1 < b) && (( $2 == tickers_split[i] ) || ( tickers == "" ))) { print $line }}}}' | sort | uniq )
 done < "$logs"
 
+#=====================================================================
+#                           COMMANDS EXECUTION
+#=====================================================================
+if [ "$1" = "list-tick" ]; then
+	shift
+    if [ $comm_flag = 1 ]; then
+        echo "ERROR: there can only be one command input. Program will shut down."
+        exit 0
+    fi
+    comm_flag=1
+    echo "found list-tick"
+elif [ "$1" = "profit" ]; then
+    shift
+    if [ $comm_flag = 1 ]; then
+        echo "ERROR: there can only be one command input. Program will shut down."
+        exit 0
+    fi
+    comm_flag=1
+    echo "found profit"
+elif [ "$1" = "pos" ]; then
+    shift
+    if [ $comm_flag = 1 ]; then
+        echo "ERROR: there can only be one command input. Program will shut down."
+        exit 0
+    fi
+    comm_flag=1
+    echo "found pos"
+elif [ "$1" = "last-price" ]; then
+    shift
+    if [ $comm_flag = 1 ]; then
+        echo "ERROR: there can only be one command input. Program will shut down."
+        exit 0
+    fi
+    comm_flag=1
+    echo "found last-price"
+elif [ "$1" = "list-ord" ]; then
+    shift
+    if [ $comm_flag = 1 ]; then
+        echo "ERROR: there can only be one command input. Program will shut down."
+        exit 0
+    fi
+    comm_flag=1
+    echo "found list-ord"
+elif [ "$1" = "graph-pos" ]; then
+    shift
+    if [ $comm_flag = 1 ]; then
+        echo "ERROR: there can only be one command input. Program will shut down."
+        exit 0
+    fi
+    comm_flag=1
+    echo "found graph-pos"
+else
+    if [ $comm_msg_flag = 0 ]; then
+        echo "no command input."
+    fi
+fi
+#=====================================================================
+#                               PRINTS
+#=====================================================================
+
+echo "====="
+echo "logs are: $logs"
+echo "====="
+echo "OUTPUT"
 echo ""
-echo "$logs"
-echo ""
-
-
-
-TICKS_FILTER="grep '^.*;\($TICKERS\)'"
-#READ_FILTERED="eval $READ_INPUT | awk -F ';' 'if (\$1 > $a_DATETIME &&) {print \$0}' | eval $TICKS_FILTER"    #';' is separator(delimiter)
-
+echo "$logs_filtered"
+echo "====="
+echo "tickers: $TICKERS"
+echo "number of tickers is $tickers_cnt"
 echo "-a date is $a_DATETIME"
 echo "-b date is $b_DATETIME"
+echo "width is $width"
 
 #GZ_READ_INPUT="gzip -d -c $GZIP | cat $LOG_FILES - | sort"
 #READ_INPUT="cat $LOG_FILES - | sort"
