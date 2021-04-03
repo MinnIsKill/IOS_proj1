@@ -63,9 +63,9 @@ print_help() {
     echo ""
 }
 
-a_DATETIME="0000-00-00 00:00:00"    # initialize to a value where everything will be after this date
+a_datetime="0000-00-00 00:00:00"    # initialize to a value where everything will be after this date
                                     # (alternatively, an empty string would suffice)
-b_DATETIME="9999-99-99 99:99:99"    # initialize to a value where everything will be before this date
+b_datetime="9999-99-99 99:99:99"    # initialize to a value where everything will be before this date
 width=1000
 w_flag=0
 help_flag=0
@@ -74,10 +74,19 @@ newline=$'\n'
 
 declare -a tickers_arr
 
-TICKERS=""
+tickers=""
 tickers_flag=0
 tickers_cnt=0
-COMMAND=""                          # variable for loaded command (CAN ALWAYS BE ONLY ONE)
+command=""                          # variable for loaded command (CAN ALWAYS BE ONLY ONE)
+first_line=""
+first_flag=0
+
+comm_flag=0
+comm_msg_flag=0
+i=0
+
+value=0
+sum=0
 
 #=====================================================================
 #                           FILTERS PARSING
@@ -93,7 +102,7 @@ for param in "$@"; do
         shift
         #echo "found -a"
         if [[ "$1" =~ [0-9]{4}-[0-9]{2}-[0-9]{2}[" "]{1}[0-9]{2}:[0-9]{2}:[0-9]{2} ]]; then
-            a_DATETIME="$1"
+            a_datetime="$1"
             shift
         else
             echo "Wrong date format input for filter -a. Treated as an error."
@@ -104,7 +113,7 @@ for param in "$@"; do
         shift
         #echo "found -b"
         if [[ "$1" =~ [0-9]{4}-[0-9]{2}-[0-9]{2}[" "]{1}[0-9]{2}:[0-9]{2}:[0-9]{2} ]]; then
-            b_DATETIME="$1"
+            b_datetime="$1"
             shift
         else
             echo "Wrong date format input for filter -b. Treated as an error. Program will shut down."
@@ -115,10 +124,10 @@ for param in "$@"; do
         shift
         if [ $tickers_flag = 0 ]; then
             tickers_flag=1
-            TICKERS="$1"
+            tickers="$1"
         else
-            #TICKERS="${TICKERS}${newline}$1"
-            TICKERS="${TICKERS};$1"
+            #tickers="${tickers}${newline}$1"
+            tickers="${tickers};$1"
         fi
         tickers_cnt=$((tickers_cnt+1))
         #tickers_arr[$tickers_cnt]=$1
@@ -149,63 +158,65 @@ for param in "$@"; do
     fi
 done
 
-comm_flag=0
-comm_msg_flag=0
-i=0
-
 #=====================================================================
 #                           COMMAND PARSING
 #=====================================================================
 until [ $i -gt 1 ] # will go through twice just to check whether next arg isn't a command as well (forbidden situation) 
 do
     if [ "$1" = "list-tick" ]; then
+        if [ $comm_flag = 1 ]; then
+            echo "ERROR: there can only be one command input. Program will shut down."
+            exit 0
+        fi
+        command="$1"
+        comm_flag=1
+        #echo "found list-tick"
 	    shift
-        if [ $comm_flag = 1 ]; then
-            echo "ERROR: there can only be one command input. Program will shut down."
-            exit 0
-        fi
-        comm_flag=1
-        echo "found list-tick"
     elif [ "$1" = "profit" ]; then
-        shift
         if [ $comm_flag = 1 ]; then
             echo "ERROR: there can only be one command input. Program will shut down."
             exit 0
         fi
+        command="$1"
         comm_flag=1
-        echo "found profit"
+        #echo "found profit"
+        shift
     elif [ "$1" = "pos" ]; then
-        shift
         if [ $comm_flag = 1 ]; then
             echo "ERROR: there can only be one command input. Program will shut down."
             exit 0
         fi
+        command="$1"
         comm_flag=1
-        echo "found pos"
+        #echo "found pos"
+        shift
     elif [ "$1" = "last-price" ]; then
-        shift
         if [ $comm_flag = 1 ]; then
             echo "ERROR: there can only be one command input. Program will shut down."
             exit 0
         fi
+        command="$1"
         comm_flag=1
-        echo "found last-price"
-    elif [ "$1" = "list-ord" ]; then
+        #echo "found last-price"
         shift
+    elif [ "$1" = "hist-ord" ]; then
         if [ $comm_flag = 1 ]; then
             echo "ERROR: there can only be one command input. Program will shut down."
             exit 0
         fi
+        command="$1"
         comm_flag=1
-        echo "found list-ord"
+        #echo "found list-ord"
+        shift
     elif [ "$1" = "graph-pos" ]; then
-        shift
         if [ $comm_flag = 1 ]; then
             echo "ERROR: there can only be one command input. Program will shut down."
             exit 0
         fi
+        command="$1"
         comm_flag=1
-        echo "found graph-pos"
+        #echo "found graph-pos"
+        shift
     else
         if [ $comm_msg_flag = 0 ]; then
             echo "no command input."
@@ -235,9 +246,9 @@ done
 logs="" #variable to load logs into
 
 if [[ "$1" =~ .gz$ ]]; then
-    logs=($(gzip -d -c $list)) #if the input is zipped, load it like this (NOT TESTED YET AND I'M NOT EVEN GONNA UNTIL I'VE MADE THE PROGRAM WORK WITHOUT)
+    logs=$(gzip -d -c $list) #if the input is zipped, load it like this (NOT TESTED YET AND I'M NOT EVEN GONNA UNTIL I'VE MADE THE PROGRAM WORK WITHOUT)
 elif [[ "$1" =~ .log$ ]]; then
-    logs=($(ls -d $1)) #if the input is normal log file, load whole log into this variable
+    logs=$(ls -d $1) #if the input is normal log file, load whole log into this variable
 else
     echo ""
     #read logs from input, I'll get back to this if I have spare time (very unlikely)
@@ -249,83 +260,115 @@ fi
 #=====================================================================
 #                           FILTERS EXECUTION
 #=====================================================================
+#the 'awk' in the 'while read' loop didn't want to read the first line of log, so I had to improvise.
+first_line=""
+first_line=$(gawk 'NR == 1' $logs)
+first_line_test=""
+first_line_test=$(gawk 'NR == 1' $logs | awk -F ';' -v a="$a_datetime" -v b="$b_datetime" -v tickers="$tickers" -v cnt="$tickers_cnt" -v first="$first_line" '{ split(tickers,tickers_split,";");
+{if ( cnt == 0 ) { cnt=1 } } {for (i = cnt; i > 0; i--) {if ( ($1 > a) && ($1 < b) && (( $2 == tickers_split[i] ) || ( tickers == "" ))) { print first }}}}')
+
 while read -r line; do #if the input was a normal log file, this is how to read it from our copy line by line
 #which means that here, I will be executing the commands... is this done then? have I figured it out? could it be that easy? only time will tell...
-    logs_filtered=$(awk -F ';' -v a="$a_DATETIME" -v b="$b_DATETIME" -v tickers=$TICKERS -v cnt=$tickers_cnt '{ split(tickers,tickers_split,";"); {if ( cnt == 0 ) { cnt=1 } } {for (i = cnt; i > 0; i--) {if ( ($1 > a) && ($1 < b) && (( $2 == tickers_split[i] ) || ( tickers == "" ))) { print $line }}}}' | sort | uniq )
+    #!!!NEED TO FIGURE OUT HOW TO PROCESS FIRST LINE AS WELL
+    #maybe with BEGIN?
+    logs_filtered=$(gawk -F ';' -v a="$a_datetime" -v b="$b_datetime" -v tickers="$tickers" -v cnt="$tickers_cnt" '{ split(tickers,tickers_split,";");
+    {if ( cnt == 0 ) { cnt=1 } } {for (i = cnt; i > 0; i--) {if ( ($1 > a) && ($1 < b) && (( $2 == tickers_split[i] ) || ( tickers == "" ))) { print $line }}}}' | sort | uniq )
+    if [ "$first_line_test" != "" ]; then #if first line of log met the criteria as well
+        if [ "$logs_filtered" != "" ]; then
+            logs_filtered="${first_line_test}${newline}${logs_filtered}"
+        else
+            logs_filtered="$first_line_test"
+        fi
+    fi
 done < "$logs"
 
 #=====================================================================
-#                           COMMANDS EXECUTION
+#                           COMMAND EXECUTION
 #=====================================================================
-if [ "$1" = "list-tick" ]; then
-	shift
-    if [ $comm_flag = 1 ]; then
-        echo "ERROR: there can only be one command input. Program will shut down."
+logs_filtered="${newline}${logs_filtered}" #because the 'awk' in the following 'while read' loop refuses to read the first line again.
+                                           #however, this time around, I can simply use a cheeky workaround (still probably not the best
+                                           #solution possible, I should have probably ditched the 'while read' for something better ages
+                                           #ago, but hey - it works, and I'm on a strict time schedule, so I have to cut some corners.)
+
+while read -r line; do
+    if [ "$command" = "list-tick" ]; then
+        logs_filtered2=$(gawk -F ';' '{ print $2 }' | sort | uniq )
+        echo "$logs_filtered2"
         exit 0
-    fi
-    comm_flag=1
-    echo "found list-tick"
-elif [ "$1" = "profit" ]; then
-    shift
-    if [ $comm_flag = 1 ]; then
-        echo "ERROR: there can only be one command input. Program will shut down."
+    elif [ "$command" = "profit" ]; then
+        sum=$(gawk -F ';' '{ if ( $3 == "sell" ){ sum+=( $4*$6 )} else { if ($3 == "buy") { sum-=( $4*$6 ) }} } END{ printf "%.2f\n",sum }')
+        echo "$sum"
         exit 0
-    fi
-    comm_flag=1
-    echo "found profit"
-elif [ "$1" = "pos" ]; then
-    shift
-    if [ $comm_flag = 1 ]; then
-        echo "ERROR: there can only be one command input. Program will shut down."
+    elif [ "$command" = "pos" ]; then
+        uniq_tickers=$(gawk -F ';' '{ print $2 }' | sort | uniq ) # basically do 'list-tick' to get all unique tickers
+        uniq_tickers="${newline}${uniq_tickers}"
+        #while read -r line; do
+        #    num_of_uniques=$(gawk -F ';' '{ num_of_uniques+=1 } END{ printf "%d",num_of_uniques }')
+        #done <<< "$uniq_tickers"
+        while read -r line; do
+            uniq_tickers_oneline=$(gawk 'BEGIN { ORS=";" }; { print $1 }')
+        done <<< "$uniq_tickers"
+        while read -r line; do
+            logs_filtered2=$(gawk -F ';' -v tickers=$uniq_tickers_oneline '{ split(tickers,tickers_split,";"); 
+            {for (x in tickers_split) { if ($2 == tickers_split[x]) { if ($3 == "sell" ) { tickers_split[$2]+=( $4*$6 )} else { if ($3 == "buy" ) { tickers_split[$2]-=( $4*$6 )}}} } } 
+            {for (ticker in tickers_split) { if (ticker > 9) { printf "%s:%d\n", ticker,tickers_split[ticker] }}}
+            }' | sort)
+        done <<< "$logs_filtered"
+        
+        #while read -r line; do
+        #done <<< "$logs_filtered2"
+
+        echo "$logs_filtered2"
+        echo "$uniq_tickers_oneline"
+        #echo "$num_of_uniques"
+
+        #'\\\\n'
+
+
         exit 0
+    elif [ "$command" = "last-price" ]; then
+        echo "found last-price"
+    elif [ "$command" = "hist-ord" ]; then
+        echo "found hist-ord"
+    elif [ "$command" = "graph-pos" ]; then
+        echo "found graph-pos"
     fi
-    comm_flag=1
-    echo "found pos"
-elif [ "$1" = "last-price" ]; then
-    shift
-    if [ $comm_flag = 1 ]; then
-        echo "ERROR: there can only be one command input. Program will shut down."
-        exit 0
-    fi
-    comm_flag=1
-    echo "found last-price"
-elif [ "$1" = "list-ord" ]; then
-    shift
-    if [ $comm_flag = 1 ]; then
-        echo "ERROR: there can only be one command input. Program will shut down."
-        exit 0
-    fi
-    comm_flag=1
-    echo "found list-ord"
-elif [ "$1" = "graph-pos" ]; then
-    shift
-    if [ $comm_flag = 1 ]; then
-        echo "ERROR: there can only be one command input. Program will shut down."
-        exit 0
-    fi
-    comm_flag=1
-    echo "found graph-pos"
-else
-    if [ $comm_msg_flag = 0 ]; then
-        echo "no command input."
-    fi
-fi
+done <<< "$logs_filtered"
+
 #=====================================================================
 #                               PRINTS
 #=====================================================================
 
-echo "====="
+echo "=========="
 echo "logs are: $logs"
-echo "====="
-echo "OUTPUT"
+echo "=========="
+echo "OUTPUT (without command)"
 echo ""
 echo "$logs_filtered"
-echo "====="
-echo "tickers: $TICKERS"
+echo "=========="
+echo "OUTPUT (without command and first line)"
+echo ""
+echo "$logs_filtered" | gawk '{if (NR!=1) {print}}' #BECAUSE MY SOLUTION SADLY LEAVES AN EMPTY LINE AT THE TOP, I HAVE TO PRINT THE RESULTS OUT LIKE THIS
+echo "=========="
+echo "OUTPUT (with command)"
+echo ""
+echo "$logs_filtered2"
+echo "=========="
+echo "OUTPUT (with command and without first line)"
+echo ""
+echo "$logs_filtered2" | gawk '{if (NR!=1) {print}}'
+echo "=========="
+echo "tickers: $tickers"
 echo "number of tickers is $tickers_cnt"
-echo "-a date is $a_DATETIME"
-echo "-b date is $b_DATETIME"
+echo "=========="
+echo "-a date is $a_datetime"
+echo "-b date is $b_datetime"
+echo "=========="
 echo "width is $width"
+echo "=========="
+echo "command is $command"
+echo "=========="
+echo "sum is $sum"
 
 #GZ_READ_INPUT="gzip -d -c $GZIP | cat $LOG_FILES - | sort"
 #READ_INPUT="cat $LOG_FILES - | sort"
