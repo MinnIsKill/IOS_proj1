@@ -308,12 +308,26 @@ while read -r line; do
         while read -r line; do
             uniq_tickers_oneline=$(gawk 'BEGIN { ORS=";" }; { print $1 }')
         done <<< "$uniq_tickers"
-        while read -r line; do
-            logs_filtered2=$(gawk -F ';' -v tickers=$uniq_tickers_oneline '{ split(tickers,tickers_split,";"); 
-            {for (x in tickers_split) { if ($2 == tickers_split[x]) { if ($3 == "sell" ) { tickers_split[$2]+=( $4*$6 )} else { if ($3 == "buy" ) { tickers_split[$2]-=( $4*$6 )}}} } } 
-            {for (ticker in tickers_split) { if (ticker > 9) { printf "%s:%d\n", ticker,tickers_split[ticker] }}}
-            }' | sort)
-        done <<< "$logs_filtered"
+
+        echo "$logs_filtered" | gawk -F ';' -v tickers=$uniq_tickers_oneline 'BEGIN{ split(tickers,tickers_val,";"); for (x in tickers_val){ tickers_split[tickers_val[x]]=0;}}
+                                                                            {{ for (x in tickers_split) { 
+                                                                                if ($2 == x) {
+                                                                                    if ($3 == "buy" ) { 
+                                                                                        tickers_split[x]+= $6
+                                                                                        tickers_val[x]= $4
+                                                                                    } 
+                                                                                    else { if ($3 == "sell" ) { 
+                                                                                        tickers_split[x]-= $6
+                                                                                        tickers_val[x]= $4
+                                                                                        }   
+                                                                                    }
+                                                                                }}
+                                                                            }} 
+                                                                            END{ for (ticker in tickers_split) {if (ticker != "") {{ 
+                                                                                tickers_split[ticker]*=tickers_val[ticker] }
+                                                                                printf "%s:%.2f\n", ticker,tickers_split[ticker] 
+                                                                            }}}' | sort -n -r -t':' -k2
+        
         
         #while read -r line; do
         #done <<< "$logs_filtered2"
