@@ -336,6 +336,7 @@ while read -r line; do
 
         echo "$logs_filtered2" | gawk -F ':' -v dist="$longest" -v space=" " '{ if (NR!=1) {{ printf "%-9s : ",$1 } {num=dist-length($2)} { printf "%*s%.2f\n",num,"",$2 }}}'
         exit 0
+        
     elif [ "$command" = "last-price" ]; then
         echo "found last-price"
     elif [ "$command" = "hist-ord" ]; then
