@@ -368,12 +368,41 @@ while read -r line; do
         exit 0
     #==== hist-ord ====#
     elif [ "$command" = "hist-ord" ]; then
-        echo "found hist-ord"
+        uniq_tickers=$(gawk -F ';' '{ print $2 }' | sort | uniq ) # basically do 'list-tick' to get all unique tickers
+        uniq_tickers="${newline}${uniq_tickers}"
+
+        while read -r line; do
+            uniq_tickers_oneline=$(gawk 'BEGIN { ORS=";" }; { print $1 }')
+        done <<< "$uniq_tickers"
+
+        while read -r line; do
+        logs_filtered2=$(gawk -F ';' -v tickers="$uniq_tickers_oneline" 'BEGIN{ split(tickers,tickers_val,";"); for (x in tickers_val){ tickers_split[tickers_val[x]]=0;}}
+                                                                            {{ for (x in tickers_split) { 
+                                                                                if ($2 == x) {
+                                                                                    tickers_val[x]+=1
+                                                                                }}
+                                                                            }} 
+                                                                            END{ for (ticker in tickers_split) {if (ticker != "") {
+                                                                                printf "%s:%d\n", ticker,tickers_val[ticker] 
+                                                                            }}}' | sort -n -t':' -k1 )
+        done <<< "$logs_filtered"
+
+        echo "$logs_filtered2" | gawk -F ':' -v space=" " '{ { printf "%-9s : ",$1 } {for (i=$2; i>0; i--){ printf "#" }} { printf "\n" }}'
+        exit 0
     #==== graph-pos ===#
     elif [ "$command" = "graph-pos" ]; then
         echo "found graph-pos"
     fi
 done <<< "$logs_filtered"
+
+#Hodnota aktuálně držených pozic (příkazy pos a graph-pos) se pro každý ticker spočítá jako počet držených jednotek * jednotková cena 
+#   z poslední transakce, kde počet držených jednotek je dán jako suma objemů buy transakcí - suma objemů sell transakcí.
+#Pokud není při použití příkazu hist-ord uvedena šířka WIDTH, pak každá pozice v histogramu odpovídá jedné transakci.
+#Pokud není při použití příkazu graph-pos uvedena šířka WIDTH, pak každá pozice v histogramu odpovídá hodnotě 1000 (zaokrouhleno na 
+#   tisíce směrem k nule, tj. hodnota 2000 bude reprezentována jako ## zatímco hodnota 1999.99 jako # a hodnota -1999.99 jako !.
+#U příkazů hist-ord a graph-pos s uvedenou šířkou WIDTH při dělení zaokrouhlujte směrem k nule (tedy např. při graph-pos -w 6 a 
+#   nejdelším řádku s hodnotou 1234 bude řádek s hodnotou 1234 vypadat takto ######, řádek s hodnotou 1233.99 takto ##### a řádek s 
+#   hodnotou -1233.99 takto !!!!!).
 
 #=====================================================================
 #                               PRINTS
