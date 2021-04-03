@@ -291,14 +291,17 @@ logs_filtered="${newline}${logs_filtered}" #because the 'awk' in the following '
                                            #ago, but hey - it works, and I'm on a strict time schedule, so I have to cut some corners.)
 
 while read -r line; do
+    #==== list-tick ===#
     if [ "$command" = "list-tick" ]; then
         logs_filtered2=$(gawk -F ';' '{ print $2 }' | sort | uniq )
         echo "$logs_filtered2"
         exit 0
+    #===== profit =====#
     elif [ "$command" = "profit" ]; then
         sum=$(gawk -F ';' '{ if ( $3 == "sell" ){ sum+=( $4*$6 )} else { if ($3 == "buy") { sum-=( $4*$6 ) }} } END{ printf "%.2f\n",sum }')
         echo "$sum"
         exit 0
+    #======= pos ======#
     elif [ "$command" = "pos" ]; then
         uniq_tickers=$(gawk -F ';' '{ print $2 }' | sort | uniq ) # basically do 'list-tick' to get all unique tickers
         uniq_tickers="${newline}${uniq_tickers}"
@@ -336,11 +339,37 @@ while read -r line; do
 
         echo "$logs_filtered2" | gawk -F ':' -v dist="$longest" -v space=" " '{ if (NR!=1) {{ printf "%-9s : ",$1 } {num=dist-length($2)} { printf "%*s%.2f\n",num,"",$2 }}}'
         exit 0
-        
+    #=== last-price ===#
     elif [ "$command" = "last-price" ]; then
-        echo "found last-price"
+        uniq_tickers=$(gawk -F ';' '{ print $2 }' | sort | uniq ) # basically do 'list-tick' to get all unique tickers
+        uniq_tickers="${newline}${uniq_tickers}"
+
+        while read -r line; do
+            uniq_tickers_oneline=$(gawk 'BEGIN { ORS=";" }; { print $1 }')
+        done <<< "$uniq_tickers"
+
+        while read -r line; do
+        logs_filtered2=$(gawk -F ';' -v tickers="$uniq_tickers_oneline" 'BEGIN{ split(tickers,tickers_val,";"); for (x in tickers_val){ tickers_split[tickers_val[x]]=0;}}
+                                                                            {{ for (x in tickers_split) { 
+                                                                                if ($2 == x) {
+                                                                                    tickers_val[x]= $4
+                                                                                }}
+                                                                            }} 
+                                                                            END{ for (ticker in tickers_split) {if (ticker != "") {
+                                                                                printf "%s:%.2f\n", ticker,tickers_val[ticker] 
+                                                                            }}}' | sort -n -t':' -k1 )
+        done <<< "$logs_filtered"
+        logs_filtered2="${newline}${logs_filtered2}"
+        while read -r line; do
+            longest=$(gawk -F ':' 'BEGIN{ sum=0 } {if ( length($2) > sum ) { sum=length($2) }} END{printf "%d",sum}')
+        done <<< "$logs_filtered2"
+
+        echo "$logs_filtered2" | gawk -F ':' -v dist="$longest" -v space=" " '{ if (NR!=1) {{ printf "%-9s : ",$1 } {num=dist-length($2)} { printf "%*s%.2f\n",num,"",$2 }}}'
+        exit 0
+    #==== hist-ord ====#
     elif [ "$command" = "hist-ord" ]; then
         echo "found hist-ord"
+    #==== graph-pos ===#
     elif [ "$command" = "graph-pos" ]; then
         echo "found graph-pos"
     fi
