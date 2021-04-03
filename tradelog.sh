@@ -309,7 +309,8 @@ while read -r line; do
             uniq_tickers_oneline=$(gawk 'BEGIN { ORS=";" }; { print $1 }')
         done <<< "$uniq_tickers"
 
-        echo "$logs_filtered" | gawk -F ';' -v tickers=$uniq_tickers_oneline 'BEGIN{ split(tickers,tickers_val,";"); for (x in tickers_val){ tickers_split[tickers_val[x]]=0;}}
+        while read -r line; do
+        logs_filtered2=$(gawk -F ';' -v tickers="$uniq_tickers_oneline" 'BEGIN{ split(tickers,tickers_val,";"); for (x in tickers_val){ tickers_split[tickers_val[x]]=0;}}
                                                                             {{ for (x in tickers_split) { 
                                                                                 if ($2 == x) {
                                                                                     if ($3 == "buy" ) { 
@@ -326,19 +327,14 @@ while read -r line; do
                                                                             END{ for (ticker in tickers_split) {if (ticker != "") {{ 
                                                                                 tickers_split[ticker]*=tickers_val[ticker] }
                                                                                 printf "%s:%.2f\n", ticker,tickers_split[ticker] 
-                                                                            }}}' | sort -n -r -t':' -k2
-        
-        
-        #while read -r line; do
-        #done <<< "$logs_filtered2"
+                                                                            }}}' | sort -n -r -t':' -k2 )
+        done <<< "$logs_filtered"
+        logs_filtered2="${newline}${logs_filtered2}"
+        while read -r line; do
+            longest=$(gawk -F ':' 'BEGIN{ sum=0 } {if ( length($2) > sum ) { sum=length($2) }} END{printf "%d",sum}')
+        done <<< "$logs_filtered2"
 
-        echo "$logs_filtered2"
-        echo "$uniq_tickers_oneline"
-        #echo "$num_of_uniques"
-
-        #'\\\\n'
-
-
+        echo "$logs_filtered2" | gawk -F ':' -v dist="$longest" -v space=" " '{ if (NR!=1) {{ printf "%-9s : ",$1 } {num=dist-length($2)} { printf "%*s%.2f\n",num,"",$2 }}}'
         exit 0
     elif [ "$command" = "last-price" ]; then
         echo "found last-price"
