@@ -147,7 +147,7 @@ for param in "$@"; do
         fi
         shift
     elif [[ "$1" == -* ]]; then
-        echo "an attempt at inputting a parameter was made, but sadly, the program didn't recognize '$1'."
+        echo "an attempt at inputting a parameter was made, but sadly, the program either didn't recognize '$1', or it found a call for 'help' which wasn't entered as first argument."
         echo "Please refer to -h for more info. Program will shut down."
         exit 0
     else
@@ -217,9 +217,13 @@ do
         comm_flag=1
         #echo "found graph-pos"
         shift
+    elif [ "$1" = "-h" ] || [ "$1" = "--help" ] || [ "$1" = "-a" ] || [ "$1" = "-b" ] || [ "$1" = "-t" ]|| [ "$1" = "-w" ]; then
+        echo "ERROR: wrong order of arguments input. Program will shut down."
+        exit 0
     else
         if [ $comm_msg_flag = 0 ]; then
-            echo "no command input."
+            #echo "no command input."
+            iexistjusttofillthisline=0
         fi
     fi
     #echo "$i"
@@ -387,14 +391,14 @@ while read -r line; do
                                                                             }}}' | sort -n -t':' -k1 )
         done <<< "$logs_filtered"
 
-        echo "$logs_filtered2" | gawk -F ':' -v space=" " '{ { printf "%-9s : ",$1 } {for (i=$2; i>0; i--){ printf "#" }} { printf "\n" }}'
+        echo "$logs_filtered2" | gawk -F ':' -v space=" " -v width="$width" '{ { printf "%-9s :",$1 } {i=$2} {if ( i > width ){i=width}} { if (i!=0){printf " "} for (i; i>0; i--){ printf "#" }} { printf "\n" }}'
         exit 0
     #==== graph-pos ===#
     elif [ "$command" = "graph-pos" ]; then
         echo "found graph-pos"
     fi
 done <<< "$logs_filtered"
-
+#U příkazů hist-ord a graph-pos je za dvojtečkou na všech řádcích právě jedna mezera (případně žádná, pokud v pravém sloupci daného řádku nic není)
 #Hodnota aktuálně držených pozic (příkazy pos a graph-pos) se pro každý ticker spočítá jako počet držených jednotek * jednotková cena 
 #   z poslední transakce, kde počet držených jednotek je dán jako suma objemů buy transakcí - suma objemů sell transakcí.
 #Pokud není při použití příkazu hist-ord uvedena šířka WIDTH, pak každá pozice v histogramu odpovídá jedné transakci.
@@ -408,36 +412,38 @@ done <<< "$logs_filtered"
 #                               PRINTS
 #=====================================================================
 
-echo "=========="
-echo "logs are: $logs"
-echo "=========="
-echo "OUTPUT (without command)"
-echo ""
-echo "$logs_filtered"
-echo "=========="
-echo "OUTPUT (without command and first line)"
-echo ""
 echo "$logs_filtered" | gawk '{if (NR!=1) {print}}' #BECAUSE MY SOLUTION SADLY LEAVES AN EMPTY LINE AT THE TOP, I HAVE TO PRINT THE RESULTS OUT LIKE THIS
-echo "=========="
-echo "OUTPUT (with command)"
-echo ""
-echo "$logs_filtered2"
-echo "=========="
-echo "OUTPUT (with command and without first line)"
-echo ""
-echo "$logs_filtered2" | gawk '{if (NR!=1) {print}}'
-echo "=========="
-echo "tickers: $tickers"
-echo "number of tickers is $tickers_cnt"
-echo "=========="
-echo "-a date is $a_datetime"
-echo "-b date is $b_datetime"
-echo "=========="
-echo "width is $width"
-echo "=========="
-echo "command is $command"
-echo "=========="
-echo "sum is $sum"
+
+#echo "=========="
+#echo "logs are: $logs"
+#echo "=========="
+#echo "OUTPUT (without command)"
+#echo ""
+#echo "$logs_filtered"
+#echo "=========="
+#echo "OUTPUT (without command and first line)"
+#echo ""
+#echo "$logs_filtered" | gawk '{if (NR!=1) {print}}' #BECAUSE MY SOLUTION SADLY LEAVES AN EMPTY LINE AT THE TOP, I HAVE TO PRINT THE RESULTS OUT LIKE THIS
+#echo "=========="
+#echo "OUTPUT (with command)"
+#echo ""
+#echo "$logs_filtered2"
+#echo "=========="
+#echo "OUTPUT (with command and without first line)"
+#echo ""
+#echo "$logs_filtered2" | gawk '{if (NR!=1) {print}}'
+#echo "=========="
+#echo "tickers: $tickers"
+#echo "number of tickers is $tickers_cnt"
+#echo "=========="
+#echo "-a date is $a_datetime"
+#echo "-b date is $b_datetime"
+#echo "=========="
+#echo "width is $width"
+#echo "=========="
+#echo "command is $command"
+#echo "=========="
+#echo "sum is $sum"
 
 #GZ_READ_INPUT="gzip -d -c $GZIP | cat $LOG_FILES - | sort"
 #READ_INPUT="cat $LOG_FILES - | sort"
