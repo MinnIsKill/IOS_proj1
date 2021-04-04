@@ -320,7 +320,7 @@ while [ $cnt -gt -1 ]; do
     ((cnt--))
 done
 
-if [ "$logs_filtered" = "" ] && [ "$stdin_flag" = 0 ]; then #if nothing remained from logs after the filter, and we're not reading from stdin
+if [ "$logs_filtered" = "" ] && [ "$command" != "profit" ]; then #if nothing remained from logs after the filter, and we're not reading from stdin
     #echo "nothing to be done."
     exit 0
 fi
