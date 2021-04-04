@@ -1,5 +1,16 @@
 #!/bin/bash
 
+# file tradelog.sh
+# Author: Vojtěch Kališ, xkalis03.stud.fit.vutbr.cz
+# Project #1 for VUT FIT - IOS (Operating Systems)
+# TASK: Script for log analysis
+
+#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+#!!!!!TODO: CLEAN ALL THE USELESS COMMENTS BEFORE YOU TURN THE PROJECT IN!!!!!
+#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 #     LORD GIVE ME THE MENTAL CAPACITY TO REMEMBER THESE, but in the meantime, this cheatsheet should suffice.
 # GitHub push flow:   $ git add .
 #                     $ git commit -m "message"
@@ -96,6 +107,10 @@ for param in "$@"; do
         if [ $help_flag = 0 ]; then
 	        print_help
             exit 0
+        else 
+            echo "Wrong order of arguments input. Program found call for 'help' which wasn't entered as the first argument."
+            echo "Program will shut down. For correct 'help' call, please use '-h' or '--help' as the first argument."
+            exit 0
         fi
         shift
     elif [ "$1" = "-a" ]; then
@@ -135,19 +150,23 @@ for param in "$@"; do
     elif [ "$1" = "-w" ]; then
         shift
         if [ $w_flag = 1 ]; then
-            echo "filter '-w' used more than once, which is treated as error. Program will shut down."
+            echo "Filter '-w' used more than once, which is treated as an error. Program will shut down."
             exit 0
         fi
-        if [[ "$1" =~ [0-9]{1,20} ]]; then
+        if [[ "$1" < 0 ]] || [[ "$1" = 0 ]]; then
+            echo "The argument for '-w' is a number which isn't greater than 0. Program will shut down."
+            echo "Please refer to 'help', called with '-h' or '--help', for more information."
+            exit 0
+        elif [[ "$1" =~ [0-9]{1,20} ]]; then
             w_flag=1
             width="$1"
         else
-            echo "the argument for '-w' is NaN. Treated as an error. Program will shut down."
+            echo "The argument for '-w' is NaN. Treated as an error. Program will shut down."
             exit 0
         fi
         shift
     elif [[ "$1" == -* ]]; then
-        echo "an attempt at inputting a parameter was made, but sadly, the program either didn't recognize '$1', or it found a call for 'help' which wasn't entered as first argument."
+        echo "An attempt at inputting a parameter was made, but sadly, the program either didn't recognize '$1'."
         echo "Please refer to -h for more info. Program will shut down."
         exit 0
     else
@@ -391,11 +410,67 @@ while read -r line; do
                                                                             }}}' | sort -n -t':' -k1 )
         done <<< "$logs_filtered"
 
-        echo "$logs_filtered2" | gawk -F ':' -v space=" " -v width="$width" '{ { printf "%-9s :",$1 } {i=$2} {if ( i > width ){i=width}} { if (i!=0){printf " "} for (i; i>0; i--){ printf "#" }} { printf "\n" }}'
+        echo "$logs_filtered2" | gawk -F ':' -v space=" " -v width="$width" '{ { printf "%-9s :",$1 } {i=$2} 
+                                                                            {if ( i > width )
+                                                                                {i=width}} 
+                                                                            { if (i!=0)
+                                                                                {printf " "} 
+                                                                            for (i; i>0; i--){ 
+                                                                                printf "#" }} 
+                                                                            { printf "\n" }}'
         exit 0
     #==== graph-pos ===#
     elif [ "$command" = "graph-pos" ]; then
-        echo "found graph-pos"
+        uniq_tickers=$(gawk -F ';' '{ print $2 }' | sort | uniq ) # basically do 'list-tick' to get all unique tickers
+        uniq_tickers="${newline}${uniq_tickers}"
+        #while read -r line; do
+        #    num_of_uniques=$(gawk -F ';' '{ num_of_uniques+=1 } END{ printf "%d",num_of_uniques }')
+        #done <<< "$uniq_tickers"
+        while read -r line; do
+            uniq_tickers_oneline=$(gawk 'BEGIN { ORS=";" }; { print $1 }')
+        done <<< "$uniq_tickers"
+
+        while read -r line; do
+        logs_filtered2=$(gawk -F ';' -v tickers="$uniq_tickers_oneline" 'BEGIN{ split(tickers,tickers_val,";"); for (x in tickers_val){ tickers_split[tickers_val[x]]=0;}}
+                                                                            {{ for (x in tickers_split) { 
+                                                                                if ($2 == x) {
+                                                                                    if ($3 == "buy" ) { 
+                                                                                        tickers_split[x]+= $6
+                                                                                        tickers_val[x]= $4
+                                                                                    } 
+                                                                                    else { if ($3 == "sell" ) { 
+                                                                                        tickers_split[x]-= $6
+                                                                                        tickers_val[x]= $4
+                                                                                        }   
+                                                                                    }
+                                                                                }}
+                                                                            }} 
+                                                                            END{ for (ticker in tickers_split) {if (ticker != "") {{ 
+                                                                                tickers_split[ticker]*=tickers_val[ticker] }
+                                                                                printf "%s:%.2f\n", ticker,tickers_split[ticker] 
+                                                                            }}}' | sort -n -t':' -k1 )
+        done <<< "$logs_filtered"
+        logs_filtered2="${newline}${logs_filtered2}"
+        while read -r line; do
+            biggest=$(gawk -F ':' 'BEGIN{ sum=0 }
+                                    function abs(x){return ((x < 0.0) ? -x : x)} 
+                                    {if ( abs($2) > sum ) { sum=abs($2) }} END{printf "%.2f",sum}')
+        done <<< "$logs_filtered2"
+        #echo "$biggest"
+        #echo "$width"
+
+        echo "$logs_filtered2" | gawk -F ':' -v biggest="$biggest" -v width="$width" -v space=" " 'function abs(x){return ((x < 0.0) ? -x : x)} 
+                                                                                { if (NR!=1) {
+                                                                                    { printf "%-9s : ",$1 } 
+                                                                                {i=abs(int(($2 * width) / biggest))} 
+                                                                                { if (i!=0){printf " "} 
+                                                                                for (i; i>0; i--){ 
+                                                                                    if ($2 > 0){
+                                                                                        printf "#" }
+                                                                                    if ($2 < 0){
+                                                                                        printf "!" }
+                                                                                    }} { printf "\n" }}}'
+        exit 0
     fi
 done <<< "$logs_filtered"
 #U příkazů hist-ord a graph-pos je za dvojtečkou na všech řádcích právě jedna mezera (případně žádná, pokud v pravém sloupci daného řádku nic není)
