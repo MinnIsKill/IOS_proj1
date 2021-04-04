@@ -267,16 +267,18 @@ done
 #done
 
 logs="" #variable to load logs into
+gz_flag=0
+stdin_flag=0
 
 if [[ "$1" =~ .gz$ ]]; then
-    logs=$(gzip -d -c $list) #if the input is zipped, load it like this (NOT TESTED YET AND I'M NOT EVEN GONNA UNTIL I'VE MADE THE PROGRAM WORK WITHOUT)
+    gz_flag=1
+    logs="$1" #if the input is zipped, load it like this (NOT TESTED YET AND I'M NOT EVEN GONNA UNTIL I'VE MADE THE PROGRAM WORK WITHOUT)
 elif [[ "$1" =~ .log$ ]]; then
-    logs=$(ls -d $1) #if the input is normal log file, load whole log into this variable
+    logs=$(ls -d $1) #if the input is normal log file, load its name into this variable
 else
-    echo ""
+    stdin_flag=1
     #read logs from input, I'll get back to this if I have spare time (very unlikely)
 fi
-
 #I WILL ALSO HAVE TO IMPLEMENT MULTIPLE LOGS LOADING, PROBABLY SHIFT HERE AND CHECK IF THERE'S ANY OTHER INPUT AFTER THE FIRST LOG WAS LOADED AND
 #IF THERE IS THEN JUST CONCATENATE IT TO WHAT HAS ALREADY BEEN LOADED
 
@@ -284,26 +286,17 @@ fi
 #                           FILTERS EXECUTION
 #=====================================================================
 #the 'awk' in the 'while read' loop didn't want to read the first line of log, so I had to improvise.
-first_line=""
-first_line=$(gawk 'NR == 1' $logs)
-first_line_test=""
-first_line_test=$(gawk 'NR == 1' $logs | awk -F ';' -v a="$a_datetime" -v b="$b_datetime" -v tickers="$tickers" -v cnt="$tickers_cnt" -v first="$first_line" '{ split(tickers,tickers_split,";");
-{if ( cnt == 0 ) { cnt=1 } } {for (i = cnt; i > 0; i--) {if ( ($1 > a) && ($1 < b) && (( $2 == tickers_split[i] ) || ( tickers == "" ))) { print first }}}}')
 
-while read -r line; do #if the input was a normal log file, this is how to read it from our copy line by line
-#which means that here, I will be executing the commands... is this done then? have I figured it out? could it be that easy? only time will tell...
-    #!!!NEED TO FIGURE OUT HOW TO PROCESS FIRST LINE AS WELL
-    #maybe with BEGIN?
+if [ "$stdin_flag" = 1 ]; then
     logs_filtered=$(gawk -F ';' -v a="$a_datetime" -v b="$b_datetime" -v tickers="$tickers" -v cnt="$tickers_cnt" '{ split(tickers,tickers_split,";");
     {if ( cnt == 0 ) { cnt=1 } } {for (i = cnt; i > 0; i--) {if ( ($1 > a) && ($1 < b) && (( $2 == tickers_split[i] ) || ( tickers == "" ))) { print $line }}}}' | sort | uniq )
-    if [ "$first_line_test" != "" ]; then #if first line of log met the criteria as well
-        if [ "$logs_filtered" != "" ]; then
-            logs_filtered="${first_line_test}${newline}${logs_filtered}"
-        else
-            logs_filtered="$first_line_test"
-        fi
-    fi
-done < "$logs"
+elif [ $gz_flag = 1 ]; then
+    logs_filtered=$(gunzip -c $logs | gawk -F ';' -v a="$a_datetime" -v b="$b_datetime" -v tickers="$tickers" -v cnt="$tickers_cnt" '{ split(tickers,tickers_split,";");
+    {if ( cnt == 0 ) { cnt=1 } } {for (i = cnt; i > 0; i--) {if ( ($1 > a) && ($1 < b) && (( $2 == tickers_split[i] ) || ( tickers == "" ))) { print $line }}}}' | sort | uniq )
+else
+    logs_filtered=$(gawk -F ';' -v a="$a_datetime" -v b="$b_datetime" -v tickers="$tickers" -v cnt="$tickers_cnt" '{ split(tickers,tickers_split,";");
+    {if ( cnt == 0 ) { cnt=1 } } {for (i = cnt; i > 0; i--) {if ( ($1 > a) && ($1 < b) && (( $2 == tickers_split[i] ) || ( tickers == "" ))) { print $line }}}}' "$logs" | sort | uniq )
+fi
 
 #=====================================================================
 #                           COMMAND EXECUTION
@@ -473,20 +466,12 @@ while read -r line; do
         exit 0
     fi
 done <<< "$logs_filtered"
-#U příkazů hist-ord a graph-pos je za dvojtečkou na všech řádcích právě jedna mezera (případně žádná, pokud v pravém sloupci daného řádku nic není)
-#Hodnota aktuálně držených pozic (příkazy pos a graph-pos) se pro každý ticker spočítá jako počet držených jednotek * jednotková cena 
-#   z poslední transakce, kde počet držených jednotek je dán jako suma objemů buy transakcí - suma objemů sell transakcí.
-#Pokud není při použití příkazu hist-ord uvedena šířka WIDTH, pak každá pozice v histogramu odpovídá jedné transakci.
-#Pokud není při použití příkazu graph-pos uvedena šířka WIDTH, pak každá pozice v histogramu odpovídá hodnotě 1000 (zaokrouhleno na 
-#   tisíce směrem k nule, tj. hodnota 2000 bude reprezentována jako ## zatímco hodnota 1999.99 jako # a hodnota -1999.99 jako !.
-#U příkazů hist-ord a graph-pos s uvedenou šířkou WIDTH při dělení zaokrouhlujte směrem k nule (tedy např. při graph-pos -w 6 a 
-#   nejdelším řádku s hodnotou 1234 bude řádek s hodnotou 1234 vypadat takto ######, řádek s hodnotou 1233.99 takto ##### a řádek s 
-#   hodnotou -1233.99 takto !!!!!).
 
 #=====================================================================
 #                               PRINTS
 #=====================================================================
 
+#if no commands were input, print just the filtered log
 echo "$logs_filtered" | gawk '{if (NR!=1) {print}}' #BECAUSE MY SOLUTION SADLY LEAVES AN EMPTY LINE AT THE TOP, I HAVE TO PRINT THE RESULTS OUT LIKE THIS
 
 #echo "=========="
