@@ -17,6 +17,8 @@
 # GitHub pull flow:   $ git fetch origin main
 #                     $ git reset --hard origin/main
 
+#TODO: loading from both normal logs and zipped ones
+
 export POSIXLY_CORRECT=yes
 export LC_NUMERIC=en_US.UTF-8
 
@@ -320,7 +322,7 @@ while [ $cnt -gt -1 ]; do
     ((cnt--))
 done
 
-if [ "$logs_filtered" = "" ] && [ "$stdin_flag" = 0 ]; then #if nothing remained from logs after the filter, and we're not reading from stdin
+if [ "$logs_filtered" = "" ] && [ "$command" != "profit" ]; then #if nothing remained from logs after the filter, and we're not reading from stdin
     #echo "nothing to be done."
     exit 0
 fi

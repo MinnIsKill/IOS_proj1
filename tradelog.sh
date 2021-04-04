@@ -17,6 +17,8 @@
 # GitHub pull flow:   $ git fetch origin main
 #                     $ git reset --hard origin/main
 
+#TODO: loading from both normal logs and zipped ones
+
 export POSIXLY_CORRECT=yes
 export LC_NUMERIC=en_US.UTF-8
 
