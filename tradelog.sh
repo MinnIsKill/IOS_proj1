@@ -7,6 +7,16 @@
 # TASK: Script for log analysis
 #=====================================================================
 
+# LORD GIVE ME THE MENTAL CAPACITY TO REMEMBER THESE, but in the meantime, this cheatsheet should suffice.
+#
+# GitHub push flow:   $ git add .
+#                     $ git commit -m "message"
+#                     $ git push --set-upstream origin main   (where 'main' is name of branch to commit to)
+#
+# !!!(Forces local file overwrite)!!!
+# GitHub pull flow:   $ git fetch origin main
+#                     $ git reset --hard origin/main
+
 export POSIXLY_CORRECT=yes
 export LC_NUMERIC=en_US.UTF-8
 
