@@ -260,7 +260,6 @@ done
 logs=""         #variable to load logs into
 found_logs=0    #counts the number of logs loaded from input
 #the following are all just flags
-gz_flag=0       #we found zipped logs
 stdin_flag=0    #we found there are no logs (read from stdin)
 morethanone_flag=0  #we found there are more than one logs to be read
 
@@ -269,7 +268,6 @@ declare -a logs_arr #this is a bash array, into which we load all logs found in 
 for param in "$@"; do
     if [[ "$1" =~ .gz$ ]]; then     #if the input is zipped, load it like this
         if [ "$found_logs" = 0 ]; then
-            gz_flag=1
             logs_arr[$found_logs]="$1"
         else
             logs_arr[$found_logs]="$1"
@@ -302,14 +300,14 @@ cnt="$found_logs"
 cnt=$((cnt-1))
 
 while [ $cnt -gt -1 ]; do
-    if [ "$stdin_flag" = 1 ]; then
+    if [ "$stdin_flag" = 1 ]; then  #loading from stdin
         logs_filtered=$(gawk -F ';' -v a="$a_datetime" -v b="$b_datetime" -v tickers="$tickers" -v cnt="$tickers_cnt" '{ split(tickers,tickers_split,";");
         {if ( cnt == 0 ) { cnt=1 } } {for (i = cnt; i > 0; i--) {if ( ($1 > a) && ($1 < b) && (( $2 == tickers_split[i] ) || ( tickers == "" ))) { print $line }}}}' | sort | uniq )
         break
-    elif [ "$gz_flag" = 1 ]; then
+    elif [[ "${logs_arr[$cnt]}" =~ .gz$ ]]; then #loading a zipped file
         logs_filtered3=$(gunzip -c "${logs_arr[$cnt]}" | gawk -F ';' -v a="$a_datetime" -v b="$b_datetime" -v tickers="$tickers" -v cnt="$tickers_cnt" '{ split(tickers,tickers_split,";");
         {if ( cnt == 0 ) { cnt=1 } } {for (i = cnt; i > 0; i--) {if ( ($1 > a) && ($1 < b) && (( $2 == tickers_split[i] ) || ( tickers == "" ))) { print $line }}}}' | sort | uniq )
-    else
+    else    #loading a regular log
         logs_filtered3=$(gawk -F ';' -v a="$a_datetime" -v b="$b_datetime" -v tickers="$tickers" -v cnt="$tickers_cnt" '{ split(tickers,tickers_split,";");
         {if ( cnt == 0 ) { cnt=1 } } {for (i = cnt; i > 0; i--) {if ( ($1 > a) && ($1 < b) && (( $2 == tickers_split[i] ) || ( tickers == "" ))) { print $line }}}}' "${logs_arr[$cnt]}" | sort | uniq )
     fi
@@ -322,7 +320,7 @@ while [ $cnt -gt -1 ]; do
     ((cnt--))
 done
 
-if [ "$logs_filtered" = "" ] && [ "$command" != "profit" ]; then #if nothing remained from logs after the filter, and we're not reading from stdin
+if [ "$logs_filtered" = "" ] && [ "$command" != "profit" ]; then #if nothing remained from logs after the filter, and command isn't 'profit'
     #echo "nothing to be done."
     exit 0
 fi
