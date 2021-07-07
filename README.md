@@ -5,4 +5,4 @@ Project #1 for VUT FIT - IOS (Operating Systems)
 ## Project Description
 Check the pdf included in the repository.
 ## Disclaimer
-If you're a student of VUT Brno, please be aware of the school's strict plagiatorism policy. I'm posting my project only as a form of inspiration.
+If you're a student of VUT Brno, please be aware of the school's strict plagiatorism policy. I'm posting my project only to serve as a form of inspiration.
