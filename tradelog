@@ -2,7 +2,7 @@
 
 #=====================================================================
 # file tradelog.sh
-# Author: Vojtěch Kališ, xkalis03.stud.fit.vutbr.cz
+# Author: Vojtěch Kališ, xkalis03@stud.fit.vutbr.cz
 # Project #1 for VUT FIT - IOS (Operating Systems)
 # TASK: Script for log analysis
 #=====================================================================
@@ -148,7 +148,7 @@ for param in "$@"; do
         fi
         shift
     elif [[ "$1" == -* ]]; then     #found something starting with a dash, but it wasn't recognized - maybe a typo?
-        echo "An attempt at inputting a parameter was made, but sadly, the program either didn't recognize '$1'."
+        echo "An attempt at inputting a parameter was made, but sadly, the program didn't recognize '$1'."
         echo "Please refer to -h for more info. Program will shut down."
         exit 0
     else
