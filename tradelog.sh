@@ -2,7 +2,7 @@
 
 #=====================================================================
 # file tradelog.sh
-# Author: Vojtěch Kališ, xkalis03.stud.fit.vutbr.cz
+# Author: Vojtěch Kališ, xkalis03@stud.fit.vutbr.cz
 # Project #1 for VUT FIT - IOS (Operating Systems)
 # TASK: Script for log analysis
 #=====================================================================
